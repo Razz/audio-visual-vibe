@@ -1,0 +1,2284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Color Space Visualizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --dark: #202124;
+      --light: #ffffff;
+      --background: #202124;
+      --foreground: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      background: var(--background);
+      font-family: 'Inter', sans-serif;
+      color: var(--foreground);
+    }
+
+    #container {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .controls {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      background: rgba(32, 33, 36, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 1.5rem;
+      border-radius: 1rem;
+      z-index: 100;
+      max-width: 300px;
+    }
+
+    .control-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .control-section:last-child {
+      margin-bottom: 0;
+    }
+
+    h3 {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+      opacity: 0.7;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem;
+      margin: -0.5rem -0.5rem 0.75rem -0.5rem;
+      border-radius: 0.25rem;
+      transition: all 0.2s;
+    }
+
+    h3:hover {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    h3::after {
+      content: '▼';
+      font-size: 0.7rem;
+      transition: transform 0.2s;
+    }
+
+    h3.collapsed::after {
+      transform: rotate(-90deg);
+    }
+
+    .section-content {
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+      opacity: 1;
+    }
+
+    .section-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-family: 'Inter', sans-serif;
+      padding: 0.5rem 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+      color: white;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    button.active {
+      background: turquoise;
+      border-color: turquoise;
+      color: #202124;
+      font-weight: 600;
+    }
+
+    .audio-btn {
+      width: 100%;
+      padding: 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .audio-btn.recording {
+      background: #ff4444;
+      border-color: #ff4444;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .file-label {
+      display: block;
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+      color: white;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      font-size: 0.85rem;
+    }
+
+    .file-label:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .slider-control {
+      margin-bottom: 0.75rem;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      margin-bottom: 0.25rem;
+      opacity: 0.7;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: turquoise;
+    }
+
+    .audio-info {
+      font-size: 0.75rem;
+      opacity: 0.6;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+
+    .freq-bars {
+      display: flex;
+      gap: 0.25rem;
+      height: 30px;
+      margin-top: 0.5rem;
+      align-items: flex-end;
+    }
+
+    .freq-bar {
+      flex: 1;
+      background: turquoise;
+      border-radius: 2px;
+      transition: height 0.1s;
+    }
+
+    .spectrum-canvas {
+      width: 100%;
+      height: 60px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      margin-top: 0.5rem;
+    }
+
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.7rem;
+    }
+
+    .analysis-item {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .analysis-item .label {
+      opacity: 0.7;
+    }
+
+    .analysis-item .value {
+      font-weight: 600;
+      color: turquoise;
+    }
+
+    .beat-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(64, 224, 208, 0.3);
+      transition: all 0.1s;
+      display: inline-block;
+      margin-left: 0.25rem;
+    }
+
+    .beat-indicator.active {
+      background: turquoise;
+      box-shadow: 0 0 10px turquoise;
+    }
+
+    .minimize-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .fullscreen-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      z-index: 100;
+      background: rgba(32, 33, 36, 0.9);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 0.5rem;
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .fullscreen-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .controls.minimized {
+      padding: 0.75rem;
+    }
+
+    .controls.minimized .control-section {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .controls {
+        max-width: calc(100vw - 2rem);
+      }
+    }
+
+    .help-info {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      background: rgba(32, 33, 36, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.75rem;
+      z-index: 100;
+      max-width: 200px;
+      opacity: 0.7;
+      transition: opacity 0.3s;
+    }
+
+    .help-info:hover {
+      opacity: 1;
+    }
+
+    .help-info h4 {
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+      opacity: 0.9;
+    }
+
+    .help-info ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .help-info li {
+      margin-bottom: 0.25rem;
+      opacity: 0.8;
+    }
+
+    .help-toggle {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      background: rgba(32, 33, 36, 0.9);
+      backdrop-filter: blur(10px);
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      z-index: 101;
+      font-size: 0.75rem;
+      color: white;
+      transition: all 0.2s;
+    }
+
+    .help-toggle:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .help-content {
+      display: none;
+      position: absolute;
+      bottom: 3.5rem;
+      right: 0;
+      background: rgba(32, 33, 36, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      min-width: 200px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .help-content.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+
+  <div class="controls">
+    <button class="minimize-btn" id="minimizeBtn">−</button>
+    
+    <div class="control-section">
+      <h3>🎵 Audio Input</h3>
+      <div class="section-content">
+        <button class="audio-btn" id="demoBtn">Demo (Mahler)</button>
+        <div style="margin: 0.5rem 0; text-align: center; opacity: 0.5; font-size: 0.75rem;">or</div>
+        <button class="audio-btn" id="micBtn">Start Microphone</button>
+        <div style="margin: 0.5rem 0; text-align: center; opacity: 0.5; font-size: 0.75rem;">or</div>
+        <label for="audioFile" class="file-label">Upload Audio File</label>
+        <input type="file" id="audioFile" accept="audio/*">
+        <div class="freq-bars">
+          <div class="freq-bar" id="bass"></div>
+          <div class="freq-bar" id="mid"></div>
+          <div class="freq-bar" id="high"></div>
+        </div>
+        <div class="audio-info" id="audioInfo">No audio playing</div>
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>📊 Audio Analysis</h3>
+      <div class="section-content">
+        <canvas class="spectrum-canvas" id="spectrumCanvas"></canvas>
+        <div class="analysis-grid">
+          <div class="analysis-item">
+            <span class="label">Beat</span>
+            <span><span class="beat-indicator" id="beatIndicator"></span></span>
+          </div>
+          <div class="analysis-item">
+            <span class="label">RMS</span>
+            <span class="value" id="rmsValue">0%</span>
+          </div>
+          <div class="analysis-item">
+            <span class="label">Brightness</span>
+            <span class="value" id="centroidValue">0%</span>
+          </div>
+          <div class="analysis-item">
+            <span class="label">Tonality</span>
+            <span class="value" id="flatnessValue">0%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>🌊 Visualization Mode</h3>
+      <div class="section-content">
+        <div class="button-group">
+          <button class="active" data-mode="underwater">Underwater</button>
+          <button data-mode="explosive">Explosive</button>
+          <button data-mode="organic">Auto-Cam</button>
+          <button data-mode="dna">DNA Helix</button>
+          <button data-mode="fractal">Fractal</button>
+          <button data-mode="kaleidoscope">Kaleidoscope</button>
+          <button data-mode="tesseract">Tesseract</button>
+          <button data-mode="oscilloscope">Oscilloscope</button>
+          <button data-mode="sphere">Frequency Sphere</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>🎵 Music Genre</h3>
+      <div class="section-content">
+        <div class="button-group">
+          <button class="active" data-genre="electronic">Electronic</button>
+          <button data-genre="orchestral">Orchestral</button>
+          <button data-genre="rock">Rock</button>
+          <button data-genre="jazz">Jazz</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>🎨 Color Space</h3>
+      <div class="section-content">
+        <div class="button-group">
+          <button class="active" data-space="rgb">RGB</button>
+          <button data-space="hsv">HSV</button>
+          <button data-space="hsl">HSL</button>
+          <button data-space="lab">LAB</button>
+          <button data-space="tone">Tone</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>⚙️ Settings</h3>
+      <div class="section-content">
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Particle Count</span>
+            <span id="particleValue">10000</span>
+          </div>
+          <input type="range" id="particleCount" min="1000" max="15000" value="10000" step="1000">
+        </div>
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Reactivity</span>
+            <span id="reactivityValue">1.5x</span>
+          </div>
+          <input type="range" id="reactivity" min="0.5" max="3" value="1.5" step="0.1">
+        </div>
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Camera Sway</span>
+            <span id="swayValue">10%</span>
+          </div>
+          <input type="range" id="cameraSway" min="0" max="100" value="10" step="10">
+        </div>
+      </div>
+    </div>
+
+    <div class="control-section">
+      <h3>✨ Post-Processing</h3>
+      <div class="section-content">
+        <div class="button-group">
+          <button class="active" id="bloomToggle">Bloom ON</button>
+        </div>
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Bloom Strength</span>
+            <span id="bloomStrengthValue">0.5</span>
+          </div>
+          <input type="range" id="bloomStrength" min="0" max="3" value="0.5" step="0.1">
+        </div>
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Bloom Radius</span>
+            <span id="bloomRadiusValue">0.00</span>
+          </div>
+          <input type="range" id="bloomRadius" min="0" max="1" value="0" step="0.05">
+        </div>
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Bloom Threshold</span>
+            <span id="bloomThresholdValue">0.50</span>
+          </div>
+          <input type="range" id="bloomThreshold" min="0" max="1" value="0.5" step="0.05">
+        </div>
+        <div class="button-group">
+          <button class="active" id="bloomPulseToggle">Bloom Pulse ON</button>
+        </div>
+        <div class="button-group">
+          <button id="trailsToggle">Trails OFF</button>
+        </div>
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Trail Length</span>
+            <span id="trailsStrengthValue">0.7</span>
+          </div>
+          <input type="range" id="trailsStrength" min="0" max="0.95" value="0.7" step="0.05">
+        </div>
+        <div class="button-group">
+          <button class="active" id="rmsJitterToggle">RMS Jitter ON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="help-toggle" id="helpToggle">
+    ? Controls
+    <div class="help-content" id="helpContent">
+      <h4>Camera Controls</h4>
+      <ul>
+        <li>🖱️ <strong>Drag:</strong> Rotate view</li>
+        <li>🖱️ <strong>Scroll:</strong> Zoom in/out</li>
+        <li>🖱️ <strong>Right-drag:</strong> Pan</li>
+      </ul>
+    </div>
+  </div>
+
+  <button class="fullscreen-btn" id="fullscreenBtn">⛶ Fullscreen</button>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.0/chroma.min.js"></script>
+  
+  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+    import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+    import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
+
+    // Initialize all variables at the top
+    let cam, scene, renderer, controls;
+    let composer, bloomPass, fxaaPass, afterimagePass;
+    let particles = null;
+    let particleSystem = null;
+    let pMaterial = null;
+    const cubeSize = 100;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    // Audio setup
+    let audioContext = null;
+    let analyser = null;
+    let dataArray = null;
+    let waveformData = null; // Time-domain data for oscilloscope
+    let bufferLength = 0;
+    let audioSource = null;
+    let isAudioActive = false;
+    let audioElement = null;
+    let currentBlobURL = null;
+    let demoMode = false;
+    let demoTime = 0;
+
+    // Settings
+    const settings = {
+      mode: 'underwater',
+      colorSpace: 'rgb',
+      particleCount: 10000,
+      reactivity: 1.5,
+      cameraSway: 0.1,
+      musicGenre: 'electronic',
+      // Post-processing
+      bloomEnabled: true,
+      bloomStrength: 0.5,
+      bloomRadius: 0.0,
+      bloomThreshold: 0.5,
+      bloomPulse: true,        // Bloom pulses with bass
+      trailsEnabled: false,    // Particle trails/motion blur
+      trailsStrength: 0.7,     // How long trails persist (0-1)
+      rmsJitter: true          // RMS-based particle jitter (more chaos when busy)
+    };
+
+    // Music genre presets with different frequency ranges and gain compensation
+    const genrePresets = {
+      electronic: {
+        name: 'Electronic/Pop',
+        bass: [20, 150],
+        lowMid: [150, 400],
+        mid: [400, 2500],
+        highMid: [2500, 6000],
+        high: [6000, 16000],
+        // No gain compensation needed for electronic
+        bassGain: 1.0,
+        lowMidGain: 1.0,
+        midGain: 1.0,
+        highMidGain: 1.0,
+        highGain: 1.0,
+        rmsGain: 1.0          // Standard RMS
+      },
+      orchestral: {
+        name: 'Classical/Orchestral',
+        bass: [40, 180],      // Cellos, contrabass, timpani
+        lowMid: [180, 500],   // Violas, cellos, low brass, male vocals
+        mid: [500, 2500],     // Violins, woodwinds, trumpets, female vocals
+        highMid: [2500, 6000], // Flutes, high strings, brightness
+        high: [6000, 16000],  // Overtones, air, cymbals
+        // Orchestral needs significant boost in mid/high frequencies
+        // Classical music has much quieter high end than modern music
+        bassGain: 0.7,        // Reduce bass dominance
+        lowMidGain: 1.2,      // Boost low-mids (violas, cellos)
+        midGain: 2.0,         // Major boost for violins/woodwinds
+        highMidGain: 2.5,     // Huge boost for flutes/high strings
+        highGain: 3.0,        // Maximum boost for overtones/air
+        rmsGain: 1.8          // Moderate RMS boost for dynamic range
+      },
+      rock: {
+        name: 'Rock/Metal',
+        bass: [30, 180],
+        lowMid: [180, 500],
+        mid: [500, 3000],
+        highMid: [3000, 7000],
+        high: [7000, 16000],
+        bassGain: 1.2,        // Emphasize bass guitar/kick
+        lowMidGain: 1.0,
+        midGain: 1.3,         // Boost guitar/vocals
+        highMidGain: 1.2,
+        highGain: 1.1,
+        rmsGain: 1.0          // Standard RMS
+      },
+      jazz: {
+        name: 'Jazz/Acoustic',
+        bass: [50, 250],
+        lowMid: [250, 700],
+        mid: [700, 3500],
+        highMid: [3500, 8000],
+        high: [8000, 16000],
+        bassGain: 0.9,        // Slightly reduce upright bass
+        lowMidGain: 1.3,      // Boost saxophone/piano
+        midGain: 1.5,         // Boost trumpet/piano
+        highMidGain: 1.8,     // Boost ride cymbal
+        highGain: 1.4,        // Boost hi-hat/air
+        rmsGain: 1.3          // Slight RMS boost for acoustic dynamics
+      }
+    };
+
+    // Audio frequency bands - enhanced
+    const audioData = {
+      // Basic bands
+      bass: 0,
+      lowMid: 0,
+      mid: 0,
+      highMid: 0,
+      high: 0,
+      overall: 0,
+
+      // Beat detection
+      kick: 0,
+      snare: 0,
+      hat: 0,
+      beatDetected: false,
+
+      // Spectral features
+      spectralCentroid: 0,
+      spectralFlatness: 0,
+      rmsEnergy: 0,
+
+      // Smoothed values
+      bassSmooth: 0,
+      midSmooth: 0,
+      highSmooth: 0,
+      rmsSmooth: 0,
+
+      // Raw spectrum for visualization
+      spectrum: []
+    };
+
+    // Beat detection history
+    const beatHistory = {
+      energyHistory: new Array(43).fill(0), // ~0.7s at 60fps
+      energyAverage: 0,
+      lastBeatTime: 0,
+      bassHistory: new Array(20).fill(0),
+      snareHistory: new Array(20).fill(0),
+      hatHistory: new Array(20).fill(0)
+    };
+
+    // Color modes
+    const colorModes = {
+      rgb: { func: 'rgb', x: [0, 255], y: [1, 255], z: [2, 255] },
+      hsv: { func: 'hsv', x: [0, 360], y: [1, 1], z: [2, 1] },
+      hsl: { func: 'hsl', x: [0, 360], y: [1, 1], z: [2, 1] },
+      lab: { func: 'lab', z: [0, 100], y: [1, 127, -128], x: [2, 127, -128] }
+    };
+
+    let time = 0;
+
+    // Spectrum visualization
+    let spectrumCanvas = null;
+    let spectrumCtx = null;
+
+    // Camera automation for organic mode
+    const cameraTarget = {
+      x: 0,
+      y: 0,
+      z: cubeSize * 1.5,
+      nextChangeTime: 0
+    };
+
+    // Calculate base particle size based on count
+    function getBaseParticleSize() {
+      // Scale inversely with particle count
+      // 1000 particles = 5.0 size (larger, more visible)
+      // 5000 particles = 1.0 size (balanced)
+      // 15000 particles = 0.33 size (fine, not blobby)
+      return 5000 / settings.particleCount;
+    }
+
+    // Start everything
+    init();
+    setupAudio();
+    setupControls();
+    setupHelp();
+    setupSpectrum();
+    setupCollapsible();
+    setupFullscreen();
+
+    function init() {
+      cam = new THREE.PerspectiveCamera(75, width / height, 1, 500);
+      cam.position.set(0, 0, cubeSize * 1.5);
+      
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color('#202124');
+      scene.fog = new THREE.Fog('#202124', 150, 300);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(width, height);
+      document.getElementById('container').appendChild(renderer.domElement);
+
+      // Setup post-processing
+      composer = new EffectComposer(renderer);
+
+      // Render pass - renders the scene
+      const renderPass = new RenderPass(scene, cam);
+      composer.addPass(renderPass);
+
+      // Afterimage pass - particle trails (motion blur)
+      afterimagePass = new AfterimagePass(settings.trailsStrength);
+      afterimagePass.enabled = settings.trailsEnabled;
+      composer.addPass(afterimagePass);
+
+      // Bloom pass - adds glow effect
+      bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(width, height),
+        settings.bloomStrength,  // strength
+        settings.bloomRadius,    // radius
+        settings.bloomThreshold  // threshold
+      );
+      composer.addPass(bloomPass);
+
+      // FXAA pass - anti-aliasing
+      fxaaPass = new ShaderPass(FXAAShader);
+      const pixelRatio = renderer.getPixelRatio();
+      fxaaPass.material.uniforms['resolution'].value.x = 1 / (width * pixelRatio);
+      fxaaPass.material.uniforms['resolution'].value.y = 1 / (height * pixelRatio);
+      composer.addPass(fxaaPass);
+
+      controls = new OrbitControls(cam, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.enableZoom = true;
+      controls.autoRotate = false;
+
+      createParticles();
+      addCube();
+
+      window.addEventListener('resize', onWindowResize);
+      animate();
+    }
+
+    function createParticles() {
+      if (particleSystem) {
+        scene.remove(particleSystem);
+        if (particles) particles.dispose();
+        if (pMaterial) pMaterial.dispose();
+      }
+
+      particles = new THREE.BufferGeometry();
+      const positions = new Float32Array(settings.particleCount * 3);
+      const colors = new Float32Array(settings.particleCount * 3);
+
+      // ALWAYS create a filled sphere distribution using Fibonacci sphere
+      // Color space only affects color, not position
+      const phi = Math.PI * (3 - Math.sqrt(5)); // Golden angle
+
+      for (let i = 0; i < settings.particleCount; i++) {
+        // Fibonacci sphere for even distribution
+        const y = 1 - (i / (settings.particleCount - 1)) * 2;
+        const radius = Math.sqrt(1 - y * y);
+        const theta = phi * i;
+
+        const x = Math.cos(theta) * radius;
+        const z = Math.sin(theta) * radius;
+
+        // Randomize depth to fill the sphere volume
+        const depth = Math.pow(Math.random(), 0.33); // Cube root for even volume distribution
+        const sphereRadius = cubeSize * 0.4;
+
+        const i3 = i * 3;
+        positions[i3] = x * sphereRadius * depth;
+        positions[i3 + 1] = y * sphereRadius * depth;
+        positions[i3 + 2] = z * sphereRadius * depth;
+
+        // Generate color (will be overridden by audio in RGB mode)
+        const hue = Math.random() * 360;
+        const sat = 0.5 + Math.random() * 0.5;
+        const light = 0.4 + Math.random() * 0.4;
+        const color = chroma.hsl(hue, sat, light);
+
+        const rgb = color.rgb();
+        colors[i3] = rgb[0] / 255;
+        colors[i3 + 1] = rgb[1] / 255;
+        colors[i3 + 2] = rgb[2] / 255;
+      }
+
+      particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      pMaterial = new THREE.PointsMaterial({
+        size: getBaseParticleSize(),
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+      });
+
+      particleSystem = new THREE.Points(particles, pMaterial);
+      particleSystem.name = 'particles';
+      scene.add(particleSystem);
+    }
+
+    function addCube() {
+      const h = cubeSize * 0.5;
+      const vertices = new Float32Array([
+        -h, -h, -h,  -h, h, -h,
+        -h, h, -h,   h, h, -h,
+        h, h, -h,    h, -h, -h,
+        h, -h, -h,   -h, -h, -h,
+        -h, -h, h,   -h, h, h,
+        -h, h, h,    h, h, h,
+        h, h, h,     h, -h, h,
+        h, -h, h,    -h, -h, h,
+        -h, -h, -h,  -h, -h, h,
+        -h, h, -h,   -h, h, h,
+        h, h, -h,    h, h, h,
+        h, -h, -h,   h, -h, h
+      ]);
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+      const material = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.1
+      });
+
+      const cube = new THREE.LineSegments(geometry, material);
+      cube.visible = false; // Hide the macro cube
+      scene.add(cube);
+    }
+
+    function initAudioContext() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 4096; // Increased for even better frequency resolution (especially for orchestral)
+        analyser.smoothingTimeConstant = 0.85; // Higher smoothing for orchestral dynamics
+        bufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+        waveformData = new Uint8Array(analyser.fftSize); // Time-domain data for oscilloscope
+      }
+
+      // Resume context if suspended (browser autoplay policy)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+    }
+
+    function setupAudio() {
+      // Demo mode button
+      document.getElementById('demoBtn').addEventListener('click', () => {
+        const btn = document.getElementById('demoBtn');
+        const micBtn = document.getElementById('micBtn');
+
+        if (!demoMode) {
+          // Stop any active audio
+          if (audioSource) {
+            audioSource.disconnect();
+            audioSource = null;
+          }
+          if (audioElement) {
+            audioElement.pause();
+            audioElement = null;
+          }
+
+          // Load mahler.flac
+          initAudioContext();
+          audioElement = new Audio('mahler.mp3');
+          audioElement.loop = true;
+          audioElement.crossOrigin = 'anonymous';
+
+          audioElement.addEventListener('canplay', () => {
+            const source = audioContext.createMediaElementSource(audioElement);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            audioSource = source;
+            audioElement.play();
+          });
+
+          audioElement.addEventListener('error', (e) => {
+            console.error('Error loading mahler.flac:', e);
+            alert('Could not load mahler.flac. Make sure the file exists in the same directory.');
+            demoMode = false;
+            isAudioActive = false;
+            btn.textContent = 'Demo (Mahler)';
+            btn.classList.remove('active');
+          });
+
+          demoMode = true;
+          isAudioActive = true;
+          btn.textContent = 'Stop Mahler';
+          btn.classList.add('active');
+          micBtn.classList.remove('recording');
+          micBtn.textContent = 'Start Microphone';
+          document.getElementById('audioInfo').textContent = 'Demo mode active';
+        } else {
+          // Stop mahler playback
+          if (audioElement) {
+            audioElement.pause();
+            audioElement = null;
+          }
+          if (audioSource) {
+            audioSource.disconnect();
+            audioSource = null;
+          }
+          demoMode = false;
+          isAudioActive = false;
+          btn.textContent = 'Demo (Mahler)';
+          btn.classList.remove('active');
+          document.getElementById('audioInfo').textContent = 'No audio playing';
+        }
+      });
+
+      // Microphone button
+      document.getElementById('micBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('micBtn');
+
+        if (!isAudioActive) {
+          try {
+            initAudioContext();
+
+            // Stop demo mode
+            demoMode = false;
+            document.getElementById('demoBtn').classList.remove('active');
+            document.getElementById('demoBtn').textContent = 'Demo (Mahler)';
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            // Stop any existing audio
+            if (audioElement) {
+              audioElement.pause();
+              audioElement = null;
+            }
+
+            if (audioSource) {
+              audioSource.disconnect();
+            }
+
+            audioSource = audioContext.createMediaStreamSource(stream);
+            audioSource.connect(analyser);
+            isAudioActive = true;
+            btn.textContent = 'Stop Microphone';
+            btn.classList.add('recording');
+            document.getElementById('audioInfo').textContent = 'Microphone active';
+          } catch (err) {
+            console.error('Microphone error:', err);
+            document.getElementById('audioInfo').textContent = 'Microphone access denied';
+            setTimeout(() => {
+              document.getElementById('audioInfo').textContent = 'No audio playing';
+            }, 3000);
+          }
+        } else {
+          if (audioSource) {
+            audioSource.disconnect();
+            audioSource = null;
+          }
+          isAudioActive = false;
+          btn.textContent = 'Start Microphone';
+          btn.classList.remove('recording');
+          document.getElementById('audioInfo').textContent = 'No audio playing';
+        }
+      });
+
+      // File upload
+      document.getElementById('audioFile').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+          initAudioContext();
+
+          // Stop demo mode
+          demoMode = false;
+          document.getElementById('demoBtn').classList.remove('active');
+          document.getElementById('demoBtn').textContent = 'Demo (Mahler)';
+
+          // Revoke previous blob URL to prevent memory leak
+          if (currentBlobURL) {
+            URL.revokeObjectURL(currentBlobURL);
+            currentBlobURL = null;
+          }
+
+          // Stop microphone if active
+          const micBtn = document.getElementById('micBtn');
+          if (isAudioActive && micBtn.classList.contains('recording')) {
+            micBtn.textContent = 'Start Microphone';
+            micBtn.classList.remove('recording');
+          }
+
+          // Disconnect and clean up previous audio
+          if (audioSource) {
+            audioSource.disconnect();
+            audioSource = null;
+          }
+
+          if (audioElement) {
+            audioElement.pause();
+            audioElement.src = '';
+            audioElement.load();
+            audioElement = null;
+          }
+
+          // Create new audio element and blob URL
+          currentBlobURL = URL.createObjectURL(file);
+          audioElement = new Audio(currentBlobURL);
+          audioElement.loop = true;
+          audioElement.crossOrigin = 'anonymous';
+
+          // Create new media element source (can only be created once per element)
+          audioSource = audioContext.createMediaElementSource(audioElement);
+          audioSource.connect(analyser);
+          analyser.connect(audioContext.destination);
+
+          audioElement.play().catch(err => {
+            console.error('Playback error:', err);
+            document.getElementById('audioInfo').textContent = 'Playback failed: ' + err.message;
+          });
+
+          isAudioActive = true;
+          document.getElementById('audioInfo').textContent = 'Playing: ' + file.name;
+        } catch (err) {
+          console.error('File upload error:', err);
+          document.getElementById('audioInfo').textContent = 'Error: ' + err.message;
+        }
+      });
+    }
+
+    function setupControls() {
+      // Minimize button
+      document.getElementById('minimizeBtn').addEventListener('click', () => {
+        const controls = document.querySelector('.controls');
+        const btn = document.getElementById('minimizeBtn');
+        controls.classList.toggle('minimized');
+        btn.textContent = controls.classList.contains('minimized') ? '+' : '−';
+      });
+
+      // Mode buttons
+      document.querySelectorAll('[data-mode]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          settings.mode = btn.dataset.mode;
+
+          // Reset particles when changing modes for cleaner transitions
+          createParticles();
+        });
+      });
+
+      // Genre buttons
+      document.querySelectorAll('[data-genre]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-genre]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          settings.musicGenre = btn.dataset.genre;
+        });
+      });
+
+      // Color space buttons
+      document.querySelectorAll('[data-space]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-space]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          settings.colorSpace = btn.dataset.space;
+          createParticles();
+        });
+      });
+
+      // Sliders
+      document.getElementById('particleCount').addEventListener('input', (e) => {
+        settings.particleCount = parseInt(e.target.value);
+        document.getElementById('particleValue').textContent = settings.particleCount;
+        createParticles();
+      });
+
+      document.getElementById('reactivity').addEventListener('input', (e) => {
+        settings.reactivity = parseFloat(e.target.value);
+        document.getElementById('reactivityValue').textContent = settings.reactivity.toFixed(1) + 'x';
+      });
+
+      document.getElementById('cameraSway').addEventListener('input', (e) => {
+        settings.cameraSway = parseInt(e.target.value) / 100;
+        document.getElementById('swayValue').textContent = e.target.value + '%';
+      });
+
+      // Post-processing controls
+      document.getElementById('bloomToggle').addEventListener('click', () => {
+        settings.bloomEnabled = !settings.bloomEnabled;
+        const btn = document.getElementById('bloomToggle');
+        if (settings.bloomEnabled) {
+          btn.classList.add('active');
+          btn.textContent = 'Bloom ON';
+          bloomPass.enabled = true;
+        } else {
+          btn.classList.remove('active');
+          btn.textContent = 'Bloom OFF';
+          bloomPass.enabled = false;
+        }
+      });
+
+      document.getElementById('bloomStrength').addEventListener('input', (e) => {
+        settings.bloomStrength = parseFloat(e.target.value);
+        document.getElementById('bloomStrengthValue').textContent = settings.bloomStrength.toFixed(1);
+        if (bloomPass) bloomPass.strength = settings.bloomStrength;
+      });
+
+      document.getElementById('bloomRadius').addEventListener('input', (e) => {
+        settings.bloomRadius = parseFloat(e.target.value);
+        document.getElementById('bloomRadiusValue').textContent = settings.bloomRadius.toFixed(2);
+        if (bloomPass) bloomPass.radius = settings.bloomRadius;
+      });
+
+      document.getElementById('bloomThreshold').addEventListener('input', (e) => {
+        settings.bloomThreshold = parseFloat(e.target.value);
+        document.getElementById('bloomThresholdValue').textContent = settings.bloomThreshold.toFixed(2);
+        if (bloomPass) bloomPass.threshold = settings.bloomThreshold;
+      });
+
+      // Bloom pulse toggle
+      document.getElementById('bloomPulseToggle').addEventListener('click', (e) => {
+        settings.bloomPulse = !settings.bloomPulse;
+        e.target.textContent = settings.bloomPulse ? 'Bloom Pulse ON' : 'Bloom Pulse OFF';
+        e.target.classList.toggle('active');
+      });
+
+      // Trails toggle
+      document.getElementById('trailsToggle').addEventListener('click', (e) => {
+        settings.trailsEnabled = !settings.trailsEnabled;
+        e.target.textContent = settings.trailsEnabled ? 'Trails ON' : 'Trails OFF';
+        e.target.classList.toggle('active');
+        if (afterimagePass) afterimagePass.enabled = settings.trailsEnabled;
+      });
+
+      // Trails strength slider
+      document.getElementById('trailsStrength').addEventListener('input', (e) => {
+        settings.trailsStrength = parseFloat(e.target.value);
+        document.getElementById('trailsStrengthValue').textContent = settings.trailsStrength.toFixed(2);
+        if (afterimagePass) afterimagePass.uniforms['damp'].value = settings.trailsStrength;
+      });
+
+      // RMS Jitter toggle
+      document.getElementById('rmsJitterToggle').addEventListener('click', (e) => {
+        settings.rmsJitter = !settings.rmsJitter;
+        e.target.textContent = settings.rmsJitter ? 'RMS Jitter ON' : 'RMS Jitter OFF';
+        e.target.classList.toggle('active');
+      });
+    }
+
+    // Helper: Convert frequency to bin index
+    function freqToBin(freq) {
+      const nyquist = audioContext.sampleRate / 2;
+      return Math.round(freq / nyquist * bufferLength);
+    }
+
+    // Helper: Get average energy in frequency range
+    function getFreqRangeEnergy(startFreq, endFreq) {
+      const startBin = freqToBin(startFreq);
+      const endBin = freqToBin(endFreq);
+      let sum = 0;
+      for (let i = startBin; i <= endBin; i++) {
+        sum += dataArray[i];
+      }
+      return sum / (endBin - startBin + 1) / 255;
+    }
+
+    function analyzeAudio() {
+      // Check if audio is active
+      if (!isAudioActive || !analyser || !dataArray) {
+        audioData.bass = 0;
+        audioData.mid = 0;
+        audioData.high = 0;
+        audioData.overall = 0;
+        audioData.beatDetected = false;
+        return;
+      }
+
+      analyser.getByteFrequencyData(dataArray);
+      analyser.getByteTimeDomainData(waveformData); // Get waveform for oscilloscope
+
+      // === GENRE-SPECIFIC FREQUENCY BANDS ===
+      // Use selected music genre preset for frequency ranges and gain
+      const preset = genrePresets[settings.musicGenre];
+
+      // Get raw frequency energy and apply genre-specific gain compensation
+      let rawBass = getFreqRangeEnergy(preset.bass[0], preset.bass[1]);
+      let rawLowMid = getFreqRangeEnergy(preset.lowMid[0], preset.lowMid[1]);
+      let rawMid = getFreqRangeEnergy(preset.mid[0], preset.mid[1]);
+      let rawHighMid = getFreqRangeEnergy(preset.highMid[0], preset.highMid[1]);
+      let rawHigh = getFreqRangeEnergy(preset.high[0], preset.high[1]);
+
+      // Apply gain and clamp to 0-1 range
+      audioData.bass = Math.min(1.0, rawBass * preset.bassGain);
+      audioData.lowMid = Math.min(1.0, rawLowMid * preset.lowMidGain);
+      audioData.mid = Math.min(1.0, rawMid * preset.midGain);
+      audioData.highMid = Math.min(1.0, rawHighMid * preset.highMidGain);
+      audioData.high = Math.min(1.0, rawHigh * preset.highGain);
+
+      audioData.overall = (audioData.bass + audioData.lowMid + audioData.mid +
+                          audioData.highMid + audioData.high) / 5;
+
+      // === SMOOTHING ===
+      const smoothing = 0.7;
+      audioData.bassSmooth = audioData.bassSmooth * smoothing + audioData.bass * (1 - smoothing);
+      audioData.midSmooth = audioData.midSmooth * smoothing + audioData.mid * (1 - smoothing);
+      audioData.highSmooth = audioData.highSmooth * smoothing + audioData.high * (1 - smoothing);
+      audioData.rmsSmooth = audioData.rmsSmooth * smoothing + audioData.rmsEnergy * (1 - smoothing);
+
+      // === SPECTRAL FEATURES ===
+
+      // Spectral Centroid (brightness)
+      let weightedSum = 0;
+      let magnitudeSum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        weightedSum += dataArray[i] * i;
+        magnitudeSum += dataArray[i];
+      }
+      audioData.spectralCentroid = magnitudeSum > 0 ? (weightedSum / magnitudeSum) / bufferLength : 0;
+
+      // RMS Energy
+      let sumSquares = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const normalized = dataArray[i] / 255;
+        sumSquares += normalized * normalized;
+      }
+      audioData.rmsEnergy = Math.sqrt(sumSquares / bufferLength);
+
+      // Spectral Flatness (how noise-like vs tonal)
+      let geometricMean = 1;
+      let arithmeticMean = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const val = (dataArray[i] / 255) + 0.0001; // Avoid log(0)
+        geometricMean *= Math.pow(val, 1 / bufferLength);
+        arithmeticMean += val;
+      }
+      arithmeticMean /= bufferLength;
+      audioData.spectralFlatness = arithmeticMean > 0 ? geometricMean / arithmeticMean : 0;
+
+      // === BEAT DETECTION ===
+      detectBeats();
+
+      // === PERCUSSION DETECTION ===
+      // Adjust percussion ranges based on genre
+      if (settings.musicGenre === 'orchestral') {
+        // Orchestral: timpani, bass drum (lower), cymbals (brighter)
+        audioData.kick = getFreqRangeEnergy(50, 150);
+        audioData.snare = getFreqRangeEnergy(150, 400);  // Snare drum, tom-toms
+        audioData.hat = getFreqRangeEnergy(8000, 14000); // Cymbals, triangle
+      } else if (settings.musicGenre === 'jazz') {
+        // Jazz: upright bass thump, brushed snare, ride cymbal
+        audioData.kick = getFreqRangeEnergy(60, 150);
+        audioData.snare = getFreqRangeEnergy(200, 500);
+        audioData.hat = getFreqRangeEnergy(7000, 12000);
+      } else {
+        // Electronic/Rock: standard drum kit
+        audioData.kick = getFreqRangeEnergy(40, 120);
+        audioData.snare = getFreqRangeEnergy(120, 250);
+        audioData.hat = getFreqRangeEnergy(6000, 12000);
+      }
+
+      // Track percussion history for beat detection
+      beatHistory.bassHistory.push(audioData.kick);
+      beatHistory.snareHistory.push(audioData.snare);
+      beatHistory.hatHistory.push(audioData.hat);
+      beatHistory.bassHistory.shift();
+      beatHistory.snareHistory.shift();
+      beatHistory.hatHistory.shift();
+
+      // Store spectrum for visualization
+      audioData.spectrum = Array.from(dataArray).map(v => v / 255);
+
+      // Update UI bars
+      document.getElementById('bass').style.height = (audioData.bass * 100) + '%';
+      document.getElementById('mid').style.height = (audioData.mid * 100) + '%';
+      document.getElementById('high').style.height = (audioData.high * 100) + '%';
+    }
+
+    function detectBeats() {
+      // Energy-based beat detection
+      const currentEnergy = audioData.rmsEnergy;
+
+      // Update energy history
+      beatHistory.energyHistory.push(currentEnergy);
+      beatHistory.energyHistory.shift();
+
+      // Calculate average energy
+      const sum = beatHistory.energyHistory.reduce((a, b) => a + b, 0);
+      beatHistory.energyAverage = sum / beatHistory.energyHistory.length;
+
+      // Beat detection: current energy significantly higher than average
+      const C = 1.3; // Sensitivity constant (lower = more sensitive)
+      const variance = beatHistory.energyHistory.reduce((acc, val) => {
+        return acc + Math.pow(val - beatHistory.energyAverage, 2);
+      }, 0) / beatHistory.energyHistory.length;
+
+      const threshold = C * beatHistory.energyAverage;
+      const now = Date.now();
+      const timeSinceLastBeat = now - beatHistory.lastBeatTime;
+
+      // Detect beat (with minimum 100ms between beats to avoid double-triggers)
+      if (currentEnergy > threshold && timeSinceLastBeat > 100) {
+        audioData.beatDetected = true;
+        beatHistory.lastBeatTime = now;
+      } else {
+        audioData.beatDetected = false;
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      time += 0.01;
+
+      analyzeAudio();
+      drawSpectrum();
+
+      if (particleSystem && particles) {
+        const positions = particles.getAttribute('position');
+        const reactivity = settings.reactivity;
+
+        switch (settings.mode) {
+          case 'underwater':
+            // Wave motion
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+              const x = positions.array[i3];
+              const y = positions.array[i3 + 1];
+              const z = positions.array[i3 + 2];
+
+              positions.array[i3 + 1] += Math.sin(time + x * 0.05) * 0.1 * audioData.overall * reactivity;
+              positions.array[i3] += Math.cos(time + z * 0.05) * 0.1 * audioData.mid * reactivity;
+            }
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.bass * 0.5 * reactivity);
+            break;
+
+          case 'explosive':
+            // Explode from center with spring physics
+            const targetRadius = cubeSize * 0.35; // Keep within this radius
+            const maxRadius = cubeSize * 0.5;
+
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+              const x = positions.array[i3];
+              const y = positions.array[i3 + 1];
+              const z = positions.array[i3 + 2];
+
+              const dist = Math.sqrt(x * x + y * y + z * z);
+
+              if (dist > 0.1) { // Avoid division by zero
+                const dirX = x / dist;
+                const dirY = y / dist;
+                const dirZ = z / dist;
+
+                // Explosive push force (bass-driven)
+                const push = audioData.bass * 8 * reactivity;
+
+                // Spring force pulls back toward target radius
+                // Stronger when further from target
+                const distanceFromTarget = dist - targetRadius;
+                const springForce = -distanceFromTarget * 0.15;
+
+                // Damping force (friction)
+                const dampingForce = -0.05;
+
+                // Combine forces
+                const totalForce = push + springForce;
+
+                positions.array[i3] += dirX * totalForce + x * dampingForce;
+                positions.array[i3 + 1] += dirY * totalForce + y * dampingForce;
+                positions.array[i3 + 2] += dirZ * totalForce + z * dampingForce;
+
+                // Add slight turbulence to prevent uniform clustering
+                positions.array[i3] += (Math.random() - 0.5) * 0.3 * audioData.mid;
+                positions.array[i3 + 1] += (Math.random() - 0.5) * 0.3 * audioData.mid;
+                positions.array[i3 + 2] += (Math.random() - 0.5) * 0.3 * audioData.mid;
+
+                // Soft boundary - gentle push back if beyond max
+                if (dist > maxRadius) {
+                  const overflow = dist - maxRadius;
+                  positions.array[i3] -= dirX * overflow * 0.3;
+                  positions.array[i3 + 1] -= dirY * overflow * 0.3;
+                  positions.array[i3 + 2] -= dirZ * overflow * 0.3;
+                }
+              }
+            }
+
+            // Pulse size with bass
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.bass * 0.8 * reactivity);
+            break;
+
+          case 'organic':
+            // Simple underwater wave motion (same as underwater mode)
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+              const x = positions.array[i3];
+              const z = positions.array[i3 + 2];
+
+              positions.array[i3 + 1] += Math.sin(time + x * 0.05) * 0.1 * audioData.overall * reactivity;
+              positions.array[i3] += Math.cos(time + z * 0.05) * 0.1 * audioData.mid * reactivity;
+            }
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.bass * 0.5 * reactivity);
+
+            // Automated camera movement based on music energy
+            const currentTime = Date.now();
+
+            // Check if it's time to pick a new target
+            if (currentTime >= cameraTarget.nextChangeTime) {
+              // Pick random position INSIDE the sphere (closer to center for smoother feel)
+              const maxDistance = cubeSize * 0.2; // Reduced from 0.3 to stay closer to center
+              const distance = Math.random() * maxDistance;
+              const phi = Math.random() * Math.PI * 2; // Random angle around Y
+              const theta = Math.random() * Math.PI; // Random angle from top to bottom
+
+              cameraTarget.x = distance * Math.sin(theta) * Math.cos(phi);
+              cameraTarget.y = distance * Math.cos(theta);
+              cameraTarget.z = distance * Math.sin(theta) * Math.sin(phi);
+
+              // Longer intervals for more contemplative movement
+              // Lower energy = 8-12 seconds, higher energy = 5-8 seconds
+              const changeInterval = (5000 + (1 - audioData.overall) * 7000);
+              cameraTarget.nextChangeTime = currentTime + changeInterval;
+            }
+
+            // Move camera toward target - much slower, smoother movement
+            // Reduced speed significantly for gentle drifting
+            const moveSpeed = 0.005 + audioData.rmsEnergy * 0.015; // Reduced from 0.01 + 0.05
+
+            cam.position.x += (cameraTarget.x - cam.position.x) * moveSpeed;
+            cam.position.y += (cameraTarget.y - cam.position.y) * moveSpeed;
+            cam.position.z += (cameraTarget.z - cam.position.z) * moveSpeed;
+
+            // Always look at center for stable viewing
+            cam.lookAt(0, 0, 0);
+
+            break;
+
+          case 'dna':
+            // DNA Double Helix
+            const helixHeight = cubeSize * 0.6;
+            const helixRadius = cubeSize * 0.15;
+
+            // Bass controls tightness (frequency of turns)
+            const helixTightness = 0.5 + audioData.bass * 2 * reactivity;
+
+            // Mids control rotation speed
+            const rotationSpeed = audioData.mid * 0.05 * reactivity;
+
+            // Highs control particle movement along the helix
+            const flowSpeed = audioData.high * 0.5 * reactivity;
+
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+
+              // Determine which strand this particle belongs to (alternating)
+              const strand = i % 2;
+              const offset = strand * Math.PI; // 180 degree offset for second strand
+
+              // Position along the helix (based on particle index)
+              const t = (i / positions.count) * Math.PI * 4; // 4 full turns
+
+              // Add flow based on highs
+              const flowT = t + time * flowSpeed;
+
+              // Calculate helix position
+              const angle = flowT * helixTightness + time * rotationSpeed + offset;
+              const yPos = (t / (Math.PI * 4)) * helixHeight - helixHeight / 2;
+
+              // Target positions for the helix
+              const targetX = Math.cos(angle) * helixRadius;
+              const targetY = yPos;
+              const targetZ = Math.sin(angle) * helixRadius;
+
+              // Smooth transition to target (spring-like movement)
+              const smoothing = 0.1;
+              positions.array[i3] += (targetX - positions.array[i3]) * smoothing;
+              positions.array[i3 + 1] += (targetY - positions.array[i3 + 1]) * smoothing;
+              positions.array[i3 + 2] += (targetZ - positions.array[i3 + 2]) * smoothing;
+
+              // Add slight wobble based on bass
+              positions.array[i3] += Math.sin(time * 2 + i * 0.1) * audioData.bass * 2 * reactivity;
+              positions.array[i3 + 2] += Math.cos(time * 2 + i * 0.1) * audioData.bass * 2 * reactivity;
+            }
+
+            // Particle size pulses with overall energy
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.overall * 0.6 * reactivity);
+            break;
+
+          case 'fractal':
+            // Recursive Cube Fractals - RMS controls subdivision depth
+            // Low RMS = 1 big cube, High RMS = many small cubes
+
+            // Apply genre-specific RMS gain with smoothing for gradual transitions
+            const preset = genrePresets[settings.musicGenre];
+            const adjustedRMS = Math.min(1.0, audioData.rmsSmooth * preset.rmsGain);
+
+            // Calculate subdivision level based on adjusted RMS energy
+            // More gradual scaling: 1 + (RMS * 2.5)
+            // 0-0.2 RMS = 1x1x1 (1 cube)
+            // 0.2-0.4 RMS = 1x1x1 to 2x2x2 (gradual transition)
+            // 0.4-0.6 RMS = 2x2x2 to 3x3x3
+            // 0.6+ RMS = 3x3x3 to 4x4x4 (max)
+            const subdivLevel = Math.floor(1 + adjustedRMS * 2.5);
+            const gridSize = Math.min(4, subdivLevel); // Max 4x4x4 for cleaner visuals
+
+            // Generate cube vertices for current subdivision level
+            const cubeVertices = [];
+            const cubeScale = cubeSize * 0.35;
+            const spacing = (cubeScale * 2) / gridSize;
+
+            for (let gx = 0; gx <= gridSize; gx++) {
+              for (let gy = 0; gy <= gridSize; gy++) {
+                for (let gz = 0; gz <= gridSize; gz++) {
+                  // Only create vertices on the edges/faces (hollow cube grid)
+                  const isEdge = gx === 0 || gx === gridSize ||
+                                gy === 0 || gy === gridSize ||
+                                gz === 0 || gz === gridSize;
+
+                  if (isEdge) {
+                    cubeVertices.push([
+                      -cubeScale + gx * spacing,
+                      -cubeScale + gy * spacing,
+                      -cubeScale + gz * spacing
+                    ]);
+                  }
+                }
+              }
+            }
+
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+              const x = positions.array[i3];
+              const y = positions.array[i3 + 1];
+              const z = positions.array[i3 + 2];
+
+              // Assign particle to nearest cube vertex
+              const vertexIndex = i % cubeVertices.length;
+              const [tx, ty, tz] = cubeVertices[vertexIndex];
+
+              // Distance from current position to target vertex
+              const dx = x - tx;
+              const dy = y - ty;
+              const dz = z - tz;
+              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+              if (dist > 0.1) {
+                const dirX = dx / dist;
+                const dirY = dy / dist;
+                const dirZ = dz / dist;
+
+                // BASS: Explosive push outward from cube structure (very reactive!)
+                const explosiveForce = audioData.bass * 12 * reactivity;
+                positions.array[i3] += dirX * explosiveForce;
+                positions.array[i3 + 1] += dirY * explosiveForce;
+                positions.array[i3 + 2] += dirZ * explosiveForce;
+
+                // Strong spring pulls particle toward its target cube vertex
+                const springForce = -dist * 0.18;
+                positions.array[i3] += dirX * springForce;
+                positions.array[i3 + 1] += dirY * springForce;
+                positions.array[i3 + 2] += dirZ * springForce;
+
+                // Damping
+                positions.array[i3] += dx * -0.04;
+                positions.array[i3 + 1] += dy * -0.04;
+                positions.array[i3 + 2] += dz * -0.04;
+              }
+
+              // MID: Turbulence to create organic movement in the cube structure
+              positions.array[i3] += (Math.random() - 0.5) * audioData.mid * 3 * reactivity;
+              positions.array[i3 + 1] += (Math.random() - 0.5) * audioData.mid * 3 * reactivity;
+              positions.array[i3 + 2] += (Math.random() - 0.5) * audioData.mid * 3 * reactivity;
+
+              // HIGH: Rotation around Y-axis (subtle, additive)
+              const rotSpeed = audioData.high * 0.03 * reactivity;
+              const angle = Math.atan2(z, x);
+              const newAngle = angle + rotSpeed;
+              const radiusXZ = Math.sqrt(x * x + z * z);
+
+              // Apply rotation as a small adjustment, not replacement
+              const targetX = radiusXZ * Math.cos(newAngle);
+              const targetZ = radiusXZ * Math.sin(newAngle);
+              positions.array[i3] += (targetX - x) * 0.1; // Only 10% rotation influence
+              positions.array[i3 + 2] += (targetZ - z) * 0.1;
+
+              // Global containment
+              const globalDist = Math.sqrt(x * x + y * y + z * z);
+              if (globalDist > cubeSize * 0.45) {
+                const overflow = globalDist - cubeSize * 0.45;
+                positions.array[i3] -= (x / globalDist) * overflow * 0.2;
+                positions.array[i3 + 1] -= (y / globalDist) * overflow * 0.2;
+                positions.array[i3 + 2] -= (z / globalDist) * overflow * 0.2;
+              }
+            }
+
+            // Pulse size with bass
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.bass * 0.8 * reactivity);
+            break;
+
+          case 'kaleidoscope':
+            // Psychedelic Kaleidoscope - Two hemisphere halves with rotational symmetry
+            // BASS = how close the halves are (louder = closer together)
+            // MIDS = number of symmetry strands (2-12)
+            // HIGHS = rotation speed
+
+            // Calculate number of strands based on mids
+            const strandCount = Math.floor(2 + audioData.mid * 10 * reactivity);
+            const actualStrands = Math.min(12, Math.max(2, strandCount));
+
+            // Calculate separation between hemispheres (bass brings them together into sphere)
+            const maxSeparation = cubeSize * 0.15; // Much closer - 2.6x closer than before
+            const separation = maxSeparation * (1 - audioData.bass * audioData.bass); // Square for stronger bass response
+
+            // HIGH controls rotation
+            const kaleideRotation = time * audioData.high * 0.5 * reactivity;
+
+            // Hemisphere radius - FIXED size, doesn't pulse with bass (only separation changes)
+            const hemisphereRadius = cubeSize * 0.3;
+
+            // Fibonacci sphere golden angle
+            const phi = Math.PI * (3 - Math.sqrt(5));
+
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+              const x = positions.array[i3];
+              const y = positions.array[i3 + 1];
+              const z = positions.array[i3 + 2];
+
+              // Determine which hemisphere (top or bottom)
+              const isTopHemisphere = i < positions.count / 2;
+
+              // Use particle index to generate consistent position on hemisphere
+              const hemisphereParticleIndex = i % Math.floor(positions.count / 2);
+              const particlesPerHemisphere = Math.floor(positions.count / 2);
+
+              // Fibonacci hemisphere - only generate top hemisphere (Y >= 0)
+              const yFib = hemisphereParticleIndex / (particlesPerHemisphere - 1); // 0 to 1
+              const radiusFib = Math.sqrt(1 - yFib * yFib);
+              const thetaFib = phi * hemisphereParticleIndex;
+
+              const xFib = Math.cos(thetaFib) * radiusFib;
+              const zFib = Math.sin(thetaFib) * radiusFib;
+
+              // Which strand for this particle
+              const strandIndex = Math.floor(hemisphereParticleIndex / (particlesPerHemisphere / actualStrands));
+              const strandAngle = (strandIndex / actualStrands) * Math.PI * 2 + kaleideRotation;
+
+              // Apply hemisphere radius
+              let targetX = xFib * hemisphereRadius;
+              let targetY = yFib * hemisphereRadius;
+              let targetZ = zFib * hemisphereRadius;
+
+              // Rotate around Y-axis based on strand
+              const radiusXZ = Math.sqrt(targetX * targetX + targetZ * targetZ);
+              if (radiusXZ > 0.001) {
+                const baseAngle = Math.atan2(targetZ, targetX);
+                const rotatedAngle = baseAngle + strandAngle;
+
+                targetX = radiusXZ * Math.cos(rotatedAngle);
+                targetZ = radiusXZ * Math.sin(rotatedAngle);
+              }
+
+              // Apply hemisphere offset
+              if (isTopHemisphere) {
+                targetY += separation;
+              } else {
+                // Bottom hemisphere - flip and offset down
+                targetY = -targetY - separation;
+              }
+
+              // Smooth movement
+              const smoothing = 0.15;
+              positions.array[i3] += (targetX - x) * smoothing;
+              positions.array[i3 + 1] += (targetY - y) * smoothing;
+              positions.array[i3 + 2] += (targetZ - z) * smoothing;
+
+              // Turbulence from highs
+              const turbulence = audioData.high * 0.5 * reactivity;
+              positions.array[i3] += (Math.random() - 0.5) * turbulence;
+              positions.array[i3 + 1] += (Math.random() - 0.5) * turbulence;
+              positions.array[i3 + 2] += (Math.random() - 0.5) * turbulence;
+            }
+
+            // Pulse size
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.overall * 0.7 * reactivity);
+            break;
+
+          case 'tesseract':
+            // 4D Hypercube (Tesseract) projected to 3D
+            // Particles orbit around vertices to show structure
+
+            // 4D rotation angles controlled by audio
+            const angleXW = time * 0.3 + audioData.bass * 2 * reactivity;
+            const angleYW = time * 0.2 + audioData.mid * 1.5 * reactivity;
+            const angleZW = time * 0.15 + audioData.high * 1 * reactivity;
+
+            // Define 16 vertices of a tesseract in 4D space
+            const tesseractSize = cubeSize * 0.3;
+            const vertices4D = [];
+            for (let i = 0; i < 16; i++) {
+              vertices4D.push([
+                (i & 1 ? 1 : -1) * tesseractSize,
+                (i & 2 ? 1 : -1) * tesseractSize,
+                (i & 4 ? 1 : -1) * tesseractSize,
+                (i & 8 ? 1 : -1) * tesseractSize
+              ]);
+            }
+
+            // Rotate in 4D space and project to 3D
+            const rotated4D = vertices4D.map(v => {
+              let [x, y, z, w] = v;
+
+              // Rotation in XW plane
+              let newX = x * Math.cos(angleXW) - w * Math.sin(angleXW);
+              let newW = x * Math.sin(angleXW) + w * Math.cos(angleXW);
+              x = newX;
+              w = newW;
+
+              // Rotation in YW plane
+              let newY = y * Math.cos(angleYW) - w * Math.sin(angleYW);
+              newW = y * Math.sin(angleYW) + w * Math.cos(angleYW);
+              y = newY;
+              w = newW;
+
+              // Rotation in ZW plane
+              let newZ = z * Math.cos(angleZW) - w * Math.sin(angleZW);
+              newW = z * Math.sin(angleZW) + w * Math.cos(angleZW);
+              z = newZ;
+              w = newW;
+
+              // Project from 4D to 3D (perspective projection)
+              const distance = 2;
+              const w_factor = 1 / (distance - w / tesseractSize);
+              return [x * w_factor, y * w_factor, z * w_factor];
+            });
+
+            // Orbit radius around each vertex - larger to prevent sticking
+            const minOrbitRadius = cubeSize * 0.12;
+            const orbitRadius = minOrbitRadius * (1 + audioData.bass * 0.3 * reactivity);
+
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+              const x = positions.array[i3];
+              const y = positions.array[i3 + 1];
+              const z = positions.array[i3 + 2];
+
+              // Assign particle to a tesseract vertex
+              const vertexIndex = i % rotated4D.length;
+              const [vx, vy, vz] = rotated4D[vertexIndex];
+
+              // Vector from vertex to particle
+              const dx = x - vx;
+              const dy = y - vy;
+              const dz = z - vz;
+              const distFromVertex = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+              // Always apply forces, even when close
+              const safeDistance = Math.max(distFromVertex, 0.01); // Avoid division by zero
+              const dirX = dx / safeDistance;
+              const dirY = dy / safeDistance;
+              const dirZ = dz / safeDistance;
+
+              // STRONG REPULSION when too close (prevents sticking)
+              if (distFromVertex < minOrbitRadius * 0.5) {
+                const repulsionForce = (minOrbitRadius * 0.5 - distFromVertex) * 0.8;
+                positions.array[i3] += dirX * repulsionForce;
+                positions.array[i3 + 1] += dirY * repulsionForce;
+                positions.array[i3 + 2] += dirZ * repulsionForce;
+              } else {
+                // Gentle spring to maintain orbit when at safe distance
+                const springForce = -(distFromVertex - orbitRadius) * 0.08;
+                positions.array[i3] += dirX * springForce;
+                positions.array[i3 + 1] += dirY * springForce;
+                positions.array[i3 + 2] += dirZ * springForce;
+              }
+
+              // BASS: Explosive push outward from vertex
+              const explosiveForce = audioData.bass * 8 * reactivity;
+              positions.array[i3] += dirX * explosiveForce;
+              positions.array[i3 + 1] += dirY * explosiveForce;
+              positions.array[i3 + 2] += dirZ * explosiveForce;
+
+              // Orbital motion around vertex (perpendicular to radial direction)
+              const baseOrbitSpeed = 0.08; // Increased base speed
+              const orbitSpeed = baseOrbitSpeed + audioData.mid * 0.15 * reactivity;
+
+              // Create perpendicular vector for orbit
+              const perpX = -dz;
+              const perpY = dx;
+              const perpZ = dy;
+              const perpLen = Math.sqrt(perpX * perpX + perpY * perpY + perpZ * perpZ);
+
+              if (perpLen > 0.01) {
+                positions.array[i3] += (perpX / perpLen) * orbitSpeed;
+                positions.array[i3 + 1] += (perpY / perpLen) * orbitSpeed;
+                positions.array[i3 + 2] += (perpZ / perpLen) * orbitSpeed;
+              }
+
+              // Very light damping only (reduced from -0.03 to -0.01)
+              positions.array[i3] += dx * -0.01;
+              positions.array[i3 + 1] += dy * -0.01;
+              positions.array[i3 + 2] += dz * -0.01;
+
+              // HIGH: Turbulence
+              const turbulence = audioData.high * 1.5 * reactivity;
+              positions.array[i3] += (Math.random() - 0.5) * turbulence;
+              positions.array[i3 + 1] += (Math.random() - 0.5) * turbulence;
+              positions.array[i3 + 2] += (Math.random() - 0.5) * turbulence;
+            }
+
+            // Pulse size with bass
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.bass * 0.9 * reactivity);
+            break;
+
+          case 'oscilloscope':
+            // Circular Oscilloscope - waveform wraps around in 3D space
+            // Each particle represents a point in the audio waveform
+
+            if (!waveformData) break;
+
+            const samplesPerParticle = Math.floor(waveformData.length / positions.count);
+            const baseRadius = cubeSize * 0.25;
+            const waveDepth = cubeSize * 0.15; // How far waveform extends in Z
+
+            // Rotation speed controlled by mids
+            const oscRotation = time * (0.5 + audioData.mid * 2 * reactivity);
+
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+
+              // Get waveform sample for this particle
+              const sampleIndex = Math.min(i * samplesPerParticle, waveformData.length - 1);
+              const waveValue = (waveformData[sampleIndex] - 128) / 128; // -1 to 1
+
+              // Circular arrangement
+              const angle = (i / positions.count) * Math.PI * 2 + oscRotation;
+
+              // Radius modulated by waveform amplitude + bass
+              const radius = baseRadius + waveValue * waveDepth * (1 + audioData.bass * reactivity);
+
+              // Position in circle
+              const targetX = Math.cos(angle) * radius;
+              const targetY = Math.sin(angle) * radius;
+
+              // Z-depth modulated by highs and waveform
+              const targetZ = waveValue * cubeSize * 0.2 * (1 + audioData.high * reactivity);
+
+              // Smooth movement
+              const smoothing = 0.3;
+              positions.array[i3] += (targetX - positions.array[i3]) * smoothing;
+              positions.array[i3 + 1] += (targetY - positions.array[i3 + 1]) * smoothing;
+              positions.array[i3 + 2] += (targetZ - positions.array[i3 + 2]) * smoothing;
+            }
+
+            // Particle size pulses with overall audio
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.overall * 0.8 * reactivity);
+            break;
+
+          case 'sphere':
+            // Frequency Sphere - sphere with frequency-based color bands
+            // Top (red) = bass, Middle (green) = mids, Bottom (blue) = highs
+
+            const sphereRadius = cubeSize * 0.3;
+            const breathingScale = 1 + audioData.overall * 0.2 * reactivity; // Gentle pulsing
+            const sphereRotation = time * 0.2; // Slow rotation
+
+            // Fibonacci sphere for even particle distribution
+            const phiSphere = Math.PI * (3 - Math.sqrt(5));
+
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+              const x = positions.array[i3];
+              const y = positions.array[i3 + 1];
+              const z = positions.array[i3 + 2];
+
+              // Generate sphere position from particle index
+              const yNorm = 1 - (i / (positions.count - 1)) * 2; // -1 to 1
+              const radiusAtY = Math.sqrt(1 - yNorm * yNorm);
+              const theta = phiSphere * i;
+
+              let targetX = Math.cos(theta + sphereRotation) * radiusAtY;
+              let targetY = yNorm;
+              let targetZ = Math.sin(theta + sphereRotation) * radiusAtY;
+
+              // Scale to sphere size with breathing
+              targetX *= sphereRadius * breathingScale;
+              targetY *= sphereRadius * breathingScale;
+              targetZ *= sphereRadius * breathingScale;
+
+              // Gentle floating movement
+              const floatSpeed = 0.15;
+              positions.array[i3] += (targetX - x) * floatSpeed;
+              positions.array[i3 + 1] += (targetY - y) * floatSpeed;
+              positions.array[i3 + 2] += (targetZ - z) * floatSpeed;
+            }
+
+            // Particle size pulses with overall audio
+            pMaterial.size = getBaseParticleSize() * (1 + audioData.overall * 0.5 * reactivity);
+            break;
+
+        }
+
+        // Global RMS-based jitter - more chaos when music is busy
+        if (settings.rmsJitter) {
+          const jitterIntensity = audioData.rmsEnergy * 3 * reactivity;
+          if (jitterIntensity > 0.1) {
+            for (let i = 0; i < positions.count; i++) {
+              const i3 = i * 3;
+              positions.array[i3] += (Math.random() - 0.5) * jitterIntensity;
+              positions.array[i3 + 1] += (Math.random() - 0.5) * jitterIntensity;
+              positions.array[i3 + 2] += (Math.random() - 0.5) * jitterIntensity;
+            }
+          }
+        }
+
+        // Always make particles visible and update positions
+        particleSystem.visible = true;
+        positions.needsUpdate = true;
+      }
+
+      // Update colors based on mode and audio
+      if (particleSystem && particles) {
+        const colors = particles.getAttribute('color');
+        const positions = particles.getAttribute('position');
+        let r, g, b;
+
+        // Special handling for sphere mode - per-particle coloring
+        if (settings.mode === 'sphere') {
+          const sphereRadius = cubeSize * 0.3;
+
+          for (let i = 0; i < colors.count; i++) {
+            const i3 = i * 3;
+            const y = positions.array[i3 + 1];
+
+            // Normalize Y position to -1 to 1 range
+            const yNorm = y / sphereRadius; // -1 (bottom) to 1 (top)
+
+            // Map Y to color bands:
+            // Top (yNorm = 1) = RED (bass)
+            // Middle (yNorm = 0) = GREEN (mids)
+            // Bottom (yNorm = -1) = BLUE (highs)
+
+            if (yNorm > 0) {
+              // Upper half: blend from green to red
+              const blend = yNorm; // 0 to 1
+              colors.array[i3] = (1 - blend) * audioData.mid * 0.5 + blend * audioData.bass; // Red
+              colors.array[i3 + 1] = (1 - blend) * audioData.mid; // Green
+              colors.array[i3 + 2] = 0.1; // Blue
+            } else {
+              // Lower half: blend from green to blue
+              const blend = -yNorm; // 0 to 1
+              colors.array[i3] = 0.1; // Red
+              colors.array[i3 + 1] = (1 - blend) * audioData.mid; // Green
+              colors.array[i3 + 2] = (1 - blend) * audioData.mid * 0.5 + blend * audioData.high; // Blue
+            }
+          }
+
+          colors.needsUpdate = true;
+        } else if (settings.colorSpace === 'rgb') {
+          // Audio-reactive RGB: Bass = Red, Mid = Green, High = Blue
+          r = audioData.bass;        // Red channel = bass energy
+          g = audioData.mid;         // Green channel = mid energy
+          b = audioData.high;        // Blue channel = high energy
+        } else if (settings.colorSpace === 'tone') {
+          // Tone-based coloring: 3 frequency zones with smooth blending
+
+          // Normalize energy across all bands
+          const totalEnergy = audioData.bass + audioData.lowMid + audioData.mid + audioData.highMid + audioData.high + 0.01;
+
+          // Calculate weight for each zone (0-1)
+          const lowWeight = (audioData.bass + audioData.lowMid) / totalEnergy;    // Bass zone
+          const midWeight = (audioData.mid + audioData.highMid) / totalEnergy;    // Mid zone
+          const highWeight = audioData.high / totalEnergy;                         // Treble zone
+
+          // Intensity from RMS (controls brightness)
+          const intensity = audioData.rmsEnergy;
+
+          // === ZONE 1: LOW (Bass/Low-Mid) - DEEP REDS ===
+          const lowR = 0.9;  // Deep red
+          const lowG = 0.1;
+          const lowB = 0.1;
+          const lowBrightness = 0.3 + intensity * 0.7; // Loud bass = bright red
+
+          // === ZONE 2: MID (Mid/High-Mid) - WARM ORANGES/YELLOWS ===
+          const midR = 0.9;  // Orange/amber
+          const midG = 0.5;
+          const midB = 0.1;
+          const midBrightness = 0.4 + intensity * 0.6; // Brightness scales with energy
+
+          // === ZONE 3: HIGH (Treble) - COOL BLUES ===
+          const highR = 0.1; // Deep blue
+          const highG = 0.2;
+          const highB = 0.8;
+          const highBrightness = 0.2 + intensity * 0.8; // Soft violins = DEEP blue, loud = bright
+
+          // Blend the three zones smoothly
+          r = (lowR * lowWeight * lowBrightness) +
+              (midR * midWeight * midBrightness) +
+              (highR * highWeight * highBrightness);
+
+          g = (lowG * lowWeight * lowBrightness) +
+              (midG * midWeight * midBrightness) +
+              (highG * highWeight * highBrightness);
+
+          b = (lowB * lowWeight * lowBrightness) +
+              (midB * midWeight * midBrightness) +
+              (highB * highWeight * highBrightness);
+
+          // Normalize to prevent oversaturation
+          const maxChannel = Math.max(r, g, b);
+          if (maxChannel > 1) {
+            r /= maxChannel;
+            g /= maxChannel;
+            b /= maxChannel;
+          }
+        } else {
+          // Other color spaces don't update in real-time
+          return;
+        }
+
+        // Apply color to all particles uniformly (if not sphere mode)
+        if (settings.mode !== 'sphere') {
+          for (let i = 0; i < colors.count; i++) {
+            const i3 = i * 3;
+            colors.array[i3] = r;
+            colors.array[i3 + 1] = g;
+            colors.array[i3 + 2] = b;
+          }
+          colors.needsUpdate = true;
+        }
+      }
+
+      // Camera sway with bass (disabled in organic mode)
+      if (settings.mode !== 'organic') {
+        const sway = settings.cameraSway;
+        if (cam) {
+          cam.position.x += Math.sin(time * 0.5) * audioData.bass * 2 * sway;
+          cam.position.y += Math.cos(time * 0.3) * audioData.mid * 2 * sway;
+          cam.lookAt(0, 0, 0);
+        }
+      }
+
+      // Bloom pulse with bass - glow intensifies on bass hits
+      if (settings.bloomPulse && bloomPass) {
+        const bassPulse = audioData.bass * 3; // 3x bass multiplier for dramatic effect
+        bloomPass.strength = settings.bloomStrength + bassPulse; // Add bass to strength
+      } else if (bloomPass) {
+        bloomPass.strength = settings.bloomStrength;
+      }
+
+      if (controls) controls.update();
+      if (composer) {
+        composer.render();
+      } else if (renderer && scene && cam) {
+        renderer.render(scene, cam);
+      }
+    }
+
+    function setupHelp() {
+      const helpToggle = document.getElementById('helpToggle');
+      const helpContent = document.getElementById('helpContent');
+
+      helpToggle.addEventListener('click', (e) => {
+        helpContent.classList.toggle('visible');
+        e.stopPropagation();
+      });
+
+      // Close help when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!helpToggle.contains(e.target)) {
+          helpContent.classList.remove('visible');
+        }
+      });
+    }
+
+    function setupSpectrum() {
+      spectrumCanvas = document.getElementById('spectrumCanvas');
+      spectrumCtx = spectrumCanvas.getContext('2d');
+
+      // Set canvas resolution
+      const rect = spectrumCanvas.getBoundingClientRect();
+      spectrumCanvas.width = rect.width * window.devicePixelRatio;
+      spectrumCanvas.height = rect.height * window.devicePixelRatio;
+      spectrumCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+
+    function setupCollapsible() {
+      // Make each section header clickable to collapse/expand
+      document.querySelectorAll('.control-section h3').forEach(header => {
+        header.addEventListener('click', () => {
+          const content = header.nextElementSibling;
+
+          // Toggle collapsed class
+          header.classList.toggle('collapsed');
+          content.classList.toggle('collapsed');
+        });
+      });
+
+      // Start with some sections collapsed by default
+      const defaultCollapsed = ['📊 Audio Analysis', '🎨 Color Space', '⚙️ Settings'];
+      document.querySelectorAll('.control-section h3').forEach(header => {
+        const title = header.textContent.trim();
+        if (defaultCollapsed.some(collapsed => title.includes(collapsed))) {
+          header.click(); // Trigger collapse
+        }
+      });
+    }
+
+    function setupFullscreen() {
+      const btn = document.getElementById('fullscreenBtn');
+      const container = document.getElementById('container');
+
+      btn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          // Enter fullscreen
+          if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+          } else if (document.documentElement.webkitRequestFullscreen) {
+            document.documentElement.webkitRequestFullscreen();
+          }
+        } else {
+          // Exit fullscreen
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          }
+        }
+      });
+
+      // Update button text based on fullscreen state
+      document.addEventListener('fullscreenchange', updateFullscreenButton);
+      document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+
+      function updateFullscreenButton() {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+          btn.textContent = '⛶ Exit Fullscreen';
+        } else {
+          btn.textContent = '⛶ Fullscreen';
+        }
+      }
+    }
+
+    function drawSpectrum() {
+      if (!spectrumCtx || !audioData.spectrum.length) return;
+
+      const width = spectrumCanvas.width / window.devicePixelRatio;
+      const height = spectrumCanvas.height / window.devicePixelRatio;
+
+      // Clear canvas
+      spectrumCtx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      spectrumCtx.fillRect(0, 0, width, height);
+
+      // Draw spectrum bars
+      const barCount = 64; // Reduced for performance
+      const barWidth = width / barCount;
+      const step = Math.floor(audioData.spectrum.length / barCount);
+
+      for (let i = 0; i < barCount; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++) {
+          sum += audioData.spectrum[i * step + j] || 0;
+        }
+        const value = sum / step;
+        const barHeight = value * height;
+
+        // Color based on frequency (bass = blue, mid = green, high = red)
+        const hue = (i / barCount) * 180 + 160; // 160-340 (blue to pink)
+        spectrumCtx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+        spectrumCtx.fillRect(i * barWidth, height - barHeight, barWidth - 1, barHeight);
+      }
+
+      // Update analysis displays
+      document.getElementById('rmsValue').textContent = (audioData.rmsEnergy * 100).toFixed(0) + '%';
+      document.getElementById('centroidValue').textContent = (audioData.spectralCentroid * 100).toFixed(0) + '%';
+      document.getElementById('flatnessValue').textContent = (audioData.spectralFlatness * 100).toFixed(0) + '%';
+
+      // Beat indicator
+      const beatIndicator = document.getElementById('beatIndicator');
+      if (audioData.beatDetected) {
+        beatIndicator.classList.add('active');
+      } else {
+        beatIndicator.classList.remove('active');
+      }
+    }
+
+    function translate(value, low1, high1, low2, high2) {
+      return low2 + (high2 - low2) * ((value - low1) / (high1 - low1));
+    }
+
+    function onWindowResize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      if (cam) {
+        cam.aspect = width / height;
+        cam.updateProjectionMatrix();
+      }
+      if (renderer) {
+        renderer.setSize(width, height);
+      }
+      if (composer) {
+        composer.setSize(width, height);
+      }
+      if (fxaaPass) {
+        const pixelRatio = renderer.getPixelRatio();
+        fxaaPass.material.uniforms['resolution'].value.x = 1 / (width * pixelRatio);
+        fxaaPass.material.uniforms['resolution'].value.y = 1 / (height * pixelRatio);
+      }
+    }
+  </script>
+</body>
+</html>
