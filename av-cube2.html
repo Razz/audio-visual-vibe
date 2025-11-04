@@ -291,9 +291,98 @@
       display: none;
     }
 
+    /* Mobile hamburger menu */
+    .mobile-menu-toggle {
+      display: none;
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 102;
+      background: rgba(32, 33, 36, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      color: white;
+      cursor: pointer;
+      font-size: 1.5rem;
+      line-height: 1;
+      width: 48px;
+      height: 48px;
+      text-align: center;
+    }
+
     @media (max-width: 768px) {
+      .mobile-menu-toggle {
+        display: block;
+      }
+
       .controls {
-        max-width: calc(100vw - 2rem);
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 85vw;
+        max-width: 320px;
+        height: 100vh;
+        overflow-y: auto;
+        padding: 4rem 1rem 1rem 1rem;
+        margin: 0;
+        border-radius: 0;
+        transition: left 0.3s ease-out;
+        max-width: none;
+      }
+
+      .controls.mobile-open {
+        left: 0;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+      }
+
+      .fullscreen-btn {
+        top: auto;
+        bottom: 1rem;
+        right: 1rem;
+        padding: 0.75rem;
+        font-size: 0.8rem;
+      }
+
+      .help-toggle {
+        bottom: 5rem;
+      }
+
+      /* Larger touch targets on mobile */
+      button {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        min-height: 44px;
+      }
+
+      .audio-btn {
+        padding: 1rem;
+        font-size: 1rem;
+      }
+
+      /* Hide minimize button on mobile */
+      .minimize-btn {
+        display: none;
+      }
+
+      /* Compact sections on mobile */
+      .control-section {
+        margin-bottom: 1rem;
+      }
+
+      h3 {
+        font-size: 0.85rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .controls {
+        width: 90vw;
+      }
+
+      button {
+        font-size: 0.85rem;
       }
     }
 
@@ -374,6 +463,9 @@
 </head>
 <body>
   <div id="container"></div>
+
+  <!-- Mobile hamburger menu button -->
+  <button class="mobile-menu-toggle" id="mobileMenuToggle">☰</button>
 
   <div class="controls">
     <button class="minimize-btn" id="minimizeBtn">−</button>
@@ -750,6 +842,22 @@
       return 5000 / settings.particleCount;
     }
 
+    // Mobile detection and optimization
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                      (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+
+    // Auto-optimize for mobile
+    if (isMobile) {
+      console.log('Mobile device detected - applying optimizations');
+      settings.particleCount = 3000;  // Reduce particles dramatically
+      settings.bloomStrength = 0.3;    // Lower bloom
+      settings.bloomRadius = 0.0;      // No radius
+      settings.bloomThreshold = 0.7;   // Higher threshold
+      settings.trailsEnabled = false;  // Disable trails
+      settings.rmsJitter = false;      // Disable jitter
+      settings.cameraSway = 0.05;      // Reduce camera movement
+    }
+
     // Start everything
     init();
     setupAudio();
@@ -758,6 +866,7 @@
     setupSpectrum();
     setupCollapsible();
     setupFullscreen();
+    setupMobileMenu();
 
     function init() {
       cam = new THREE.PerspectiveCamera(75, width / height, 1, 500);
@@ -941,7 +1050,7 @@
 
           // Load mahler.flac
           initAudioContext();
-          audioElement = new Audio('mahler.mp3');
+          audioElement = new Audio('mahler.flac');
           audioElement.loop = true;
           audioElement.crossOrigin = 'anonymous';
 
@@ -2210,6 +2319,36 @@
         } else {
           btn.textContent = '⛶ Fullscreen';
         }
+      }
+    }
+
+    function setupMobileMenu() {
+      const toggle = document.getElementById('mobileMenuToggle');
+      const controls = document.querySelector('.controls');
+
+      if (!toggle) return;
+
+      toggle.addEventListener('click', () => {
+        controls.classList.toggle('mobile-open');
+        toggle.textContent = controls.classList.contains('mobile-open') ? '✕' : '☰';
+      });
+
+      // Close menu when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!controls.contains(e.target) && !toggle.contains(e.target)) {
+          controls.classList.remove('mobile-open');
+          toggle.textContent = '☰';
+        }
+      });
+
+      // Update UI values if mobile optimizations were applied
+      if (isMobile) {
+        document.getElementById('particleValue').textContent = settings.particleCount;
+        document.getElementById('particleCount').value = settings.particleCount;
+        document.getElementById('bloomStrengthValue').textContent = settings.bloomStrength.toFixed(1);
+        document.getElementById('bloomStrength').value = settings.bloomStrength;
+        document.getElementById('bloomThresholdValue').textContent = settings.bloomThreshold.toFixed(2);
+        document.getElementById('bloomThreshold').value = settings.bloomThreshold;
       }
     }
 
